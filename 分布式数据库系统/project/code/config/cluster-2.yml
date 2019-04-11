@@ -1,0 +1,40 @@
+version: '3'
+
+networks:
+  mongonet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.18.0.0/16
+
+services:
+  config2:
+    container_name: config2
+    image: mongo
+    networks:
+      mongonet:
+        ipv4_address: 172.18.0.40
+    volumes:
+      - ../db/conf2:/data/configdb
+    command: "mongod --configsvr --replSet config --bind_ip 172.18.0.40 --port 27017"
+
+  dbms21:
+    container_name: dbms21
+    image: mongo
+    networks:
+      mongonet:
+        ipv4_address: 172.18.0.41
+    volumes:
+      - ../db/dbms21:/data/db
+    command: "mongod --shardsvr --replSet dbms2-only --bind_ip 172.18.0.41 --port 27017"
+
+  dbms22:
+    container_name: dbms22
+    image: mongo
+    networks:
+      mongonet:
+        ipv4_address: 172.18.0.42
+    volumes:
+      - ../db/dbms22:/data/db
+    command: "mongod --shardsvr --replSet dbms12 --bind_ip 172.18.0.42 --port 27017"

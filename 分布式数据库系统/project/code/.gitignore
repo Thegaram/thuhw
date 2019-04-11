@@ -1,0 +1,5 @@
+# generated data files
+*.dat
+
+# db files
+db/
