@@ -127,7 +127,6 @@ GLFWwindow* initGL(GLuint width, GLuint height, const std::string& title)
     }
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
 
     return window;
