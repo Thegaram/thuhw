@@ -92,7 +92,7 @@ private:
         glBindVertexArray(0);
     }
 
-    static void init_textures()
+    static void init_textures(const std::string& tex_path)
     {
         // generate texture buffer
         glGenTextures(1, &texID);
@@ -109,7 +109,7 @@ private:
 
         // load texture and generate mipmaps
         int width, height;
-        auto image = SOIL_load_image("star.bmp", &width, &height, 0, SOIL_LOAD_RGB);
+        auto image = SOIL_load_image(tex_path, &width, &height, 0, SOIL_LOAD_RGB);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
         glGenerateMipmap(GL_TEXTURE_2D);
         SOIL_free_image_data(image);
@@ -128,7 +128,7 @@ public:
 
         // initialize everything
         init_vertices();
-        init_textures();
+        init_textures(tex_path);
 
         initialized = true;
     }
