@@ -1,5 +1,24 @@
 package raftkv
 
+import "log"
+import "fmt"
+
+// Debugging
+const Debug = 0
+
+func DPrintf(format string, a ...interface{}) (n int, err error) {
+	if Debug > 0 {
+		log.Printf(format, a...)
+	}
+	return
+}
+
+func assert(pred bool, msgs ...interface{}) {
+	if !pred {
+		panic(fmt.Sprintf("assertion failed", msgs...))
+	}
+}
+
 const (
 	OK       = "OK"
 	ErrNoKey = "ErrNoKey"
@@ -15,6 +34,8 @@ type PutAppendArgs struct {
 	// You'll have to add definitions here.
 	// Field names must start with capital letters,
 	// otherwise RPC will break.
+	ClientId int64
+	Id int
 }
 
 type PutAppendReply struct {

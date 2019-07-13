@@ -3,11 +3,15 @@ package raftkv
 import "labrpc"
 import "crypto/rand"
 import "math/big"
+import mrand "math/rand"
 
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
-	// You will have to modify this struct.
+
+	clientId int64
+	nextId int
+	lastSuccessfulLeaderId int
 }
 
 func nrand() int64 {
@@ -20,45 +24,64 @@ func nrand() int64 {
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
-	// You'll have to add code here.
+
+	ck.clientId = nrand()
+	ck.nextId = 1
+	ck.lastSuccessfulLeaderId = mrand.Intn(len(ck.servers))
+
 	return ck
 }
 
-//
-// fetch the current value for a key.
-// returns "" if the key does not exist.
-// keeps trying forever in the face of all other errors.
-//
-// you can send an RPC with code like this:
-// ok := ck.servers[i].Call("KVServer.Get", &args, &reply)
-//
-// the types of args and reply (including whether they are pointers)
-// must match the declared types of the RPC handler function's
-// arguments. and reply must be passed as a pointer.
-//
 func (ck *Clerk) Get(key string) string {
+	s := ck.lastSuccessfulLeaderId
+	args := GetArgs{key}
 
-	// You will have to modify this function.
-	return ""
+	for {
+		reply := GetReply{}
+		ok := ck.servers[s].Call("KVServer.GetRPC", &args, &reply)
+
+		if !ok || reply.WrongLeader {
+			s = mrand.Intn(len(ck.servers))
+			continue // retry
+		}
+
+		if reply.Err == ErrNoKey {
+			return ""
+		}
+
+		if reply.Err != OK {
+			s = mrand.Intn(len(ck.servers))
+			continue // retry
+		}
+
+		ck.lastSuccessfulLeaderId = s
+		return reply.Value
+	}
 }
 
-//
-// shared by Put and Append.
-//
-// you can send an RPC with code like this:
-// ok := ck.servers[i].Call("KVServer.PutAppend", &args, &reply)
-//
-// the types of args and reply (including whether they are pointers)
-// must match the declared types of the RPC handler function's
-// arguments. and reply must be passed as a pointer.
-//
 func (ck *Clerk) PutAppend(key string, value string, op string) {
-	// You will have to modify this function.
+	s := ck.lastSuccessfulLeaderId
+	args := PutAppendArgs{key, value, op, ck.clientId, ck.nextId}
+	ck.nextId += 1
+
+	for {
+		reply := PutAppendReply{}
+		ok := ck.servers[s].Call("KVServer.PutAppendRPC", &args, &reply)
+
+		if !ok || reply.WrongLeader || reply.Err != OK {
+			s = mrand.Intn(len(ck.servers))
+			continue // retry
+		}
+
+		ck.lastSuccessfulLeaderId = s
+		return
+	}
 }
 
 func (ck *Clerk) Put(key string, value string) {
 	ck.PutAppend(key, value, "Put")
 }
+
 func (ck *Clerk) Append(key string, value string) {
 	ck.PutAppend(key, value, "Append")
 }

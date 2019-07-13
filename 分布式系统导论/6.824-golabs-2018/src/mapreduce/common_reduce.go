@@ -1,5 +1,42 @@
 package mapreduce
 
+import (
+	"encoding/json"
+	"log"
+	"os"
+	"sort"
+)
+
+func extractValues(kvs []KeyValue) []string {
+    values := make([]string, len(kvs))
+
+    for i, kv := range kvs {
+        values[i] = kv.Value
+    }
+
+    return values
+}
+
+func readResults(jobName string, reduceTask int, nMap int) []KeyValue {
+	results := make([]KeyValue, 0)
+
+	for m := 0; m < nMap; m++ {
+		filename := reduceName(jobName, m, reduceTask)
+		file, err := os.Open(filename)
+		HandleError(err, "Unable to open file", filename)
+		defer file.Close()
+
+		dec := json.NewDecoder(file)
+		var nextValue KeyValue
+
+		for err = dec.Decode(&nextValue); err == nil; err = dec.Decode(&nextValue) {
+			results = append(results, nextValue)
+		}
+	}
+
+	return results
+}
+
 func doReduce(
 	jobName string, // the name of the whole MapReduce job
 	reduceTask int, // which reduce task this is
@@ -44,4 +81,35 @@ func doReduce(
 	//
 	// Your code here (Part I).
 	//
+
+	results := readResults(jobName, reduceTask, nMap)
+
+	if len(results) == 0 {
+		log.Fatal("Empty results in doReduce")
+	}
+
+	sort.Slice(results, func(ii, jj int) bool {
+		return results[ii].Key < results[jj].Key
+	})
+
+	file, err := os.Create(outFile)
+	HandleError(err, "Unable to create file", outFile)
+	defer file.Close()
+	enc := json.NewEncoder(file)
+
+	from := 0
+	key  := results[0].Key
+
+	for ii, kv := range results {
+		if kv.Key != key {
+			values := extractValues(results[from:ii])
+			enc.Encode(KeyValue{key, reduceF(key, values)})
+
+			from = ii
+			key = kv.Key
+		}
+	}
+
+	values := extractValues(results[from:])
+	enc.Encode(KeyValue{key, reduceF(key, values)})
 }

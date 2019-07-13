@@ -14,6 +14,8 @@ import "math/big"
 import "shardmaster"
 import "time"
 
+// import "fmt"
+
 //
 // which shard is a key in?
 // please use this function,
@@ -39,7 +41,9 @@ type Clerk struct {
 	sm       *shardmaster.Clerk
 	config   shardmaster.Config
 	make_end func(string) *labrpc.ClientEnd
-	// You will have to modify this struct.
+
+	clientId int64
+	nextId int
 }
 
 //
@@ -55,7 +59,10 @@ func MakeClerk(masters []*labrpc.ClientEnd, make_end func(string) *labrpc.Client
 	ck := new(Clerk)
 	ck.sm = shardmaster.MakeClerk(masters)
 	ck.make_end = make_end
-	// You'll have to add code here.
+
+	ck.clientId = nrand()
+	ck.nextId = 1
+
 	return ck
 }
 
@@ -67,7 +74,11 @@ func MakeClerk(masters []*labrpc.ClientEnd, make_end func(string) *labrpc.Client
 //
 func (ck *Clerk) Get(key string) string {
 	args := GetArgs{}
-	args.Key = key
+	args.Key 	  = key
+	args.ClientId = ck.clientId
+	args.Id       = ck.nextId
+
+	ck.nextId += 1
 
 	for {
 		shard := key2shard(key)
@@ -77,6 +88,7 @@ func (ck *Clerk) Get(key string) string {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
 				var reply GetReply
+				// fmt.Printf("%v: ShardKV.Get\n", ck.clientId)
 				ok := srv.Call("ShardKV.Get", &args, &reply)
 				if ok && reply.WrongLeader == false && (reply.Err == OK || reply.Err == ErrNoKey) {
 					return reply.Value
@@ -100,9 +112,13 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args := PutAppendArgs{}
-	args.Key = key
-	args.Value = value
-	args.Op = op
+	args.Key      = key
+	args.Value    = value
+	args.Op       = op
+	args.ClientId = ck.clientId
+	args.Id       = ck.nextId
+
+	ck.nextId += 1
 
 
 	for {
@@ -112,6 +128,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
 				var reply PutAppendReply
+				// fmt.Printf("%v: ShardKV.PutAppend\n", ck.clientId)
 				ok := srv.Call("ShardKV.PutAppend", &args, &reply)
 				if ok && reply.WrongLeader == false && reply.Err == OK {
 					return
@@ -126,6 +143,63 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		ck.config = ck.sm.Query(-1)
 	}
 }
+
+// func (ck *Clerk) TransferShard(args TransferShardArgs) {
+// 	// set missing fields
+// 	args.ClientId = ck.clientId
+// 	args.Id       = ck.nextId
+// 	ck.nextId += 1
+
+// 	targetConfig := ck.sm.Query(args.CID)
+
+// 	for {
+// 		if servers, ok := targetConfig.Groups[args.ToGID]; ok {
+// 			for si := 0; si < len(servers); si++ {
+// 				srv := ck.make_end(servers[si])
+// 				var reply TransferShardReply
+// 				ok := srv.Call("ShardKV.TransferShard", &args, &reply)
+// 				if ok && reply.WrongLeader == false && reply.Err == OK {
+// 					return
+// 				}
+// 				if ok && reply.Err == ErrWrongGroup {
+// 					break
+// 				}
+// 			}
+// 		}
+// 		time.Sleep(100 * time.Millisecond)
+// 		// ask master for the latest configuration.
+// 		targetConfig = ck.sm.Query(args.CID)
+// 	}
+// }
+
+// func (ck *Clerk) UpdateConfig(gid int, config shardmaster.Config) {
+// 	args := UpdateConfigArgs{}
+// 	args.Config = config // TODO: clone?
+// 	args.ClientId = ck.clientId
+// 	args.Id       = ck.nextId
+// 	ck.nextId += 1
+
+// 	targetConfig := ck.sm.Query(args.Config.Num)
+
+// 	for {
+// 		log.Printf("TRYING SERVERS %+v, gid %v", targetConfig, gid)
+// 		if servers, ok := targetConfig.Groups[gid]; ok {
+// 			for si := 0; si < len(servers); si++ {
+// 				srv := ck.make_end(servers[si])
+// 				log.Printf("TRYING SERVER %s", servers[si])
+// 				var reply UpdateConfigReply
+// 				ok := srv.Call("ShardKV.UpdateConfig", &args, &reply)
+// 				log.Printf("ok = %v, reply = %+v", ok, reply)
+// 				if ok && reply.WrongLeader == false && reply.Err == OK {
+// 					return
+// 				}
+// 			}
+// 		}
+// 		time.Sleep(100 * time.Millisecond)
+// 		// ask master for the latest configuration.
+// 		// targetConfig = ck.sm.Query(-1)
+// 	}
+// }
 
 func (ck *Clerk) Put(key string, value string) {
 	ck.PutAppend(key, value, "Put")
