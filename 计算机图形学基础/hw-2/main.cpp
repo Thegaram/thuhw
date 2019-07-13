@@ -109,7 +109,7 @@ private:
 
         // load texture and generate mipmaps
         int width, height;
-        auto image = SOIL_load_image(tex_path, &width, &height, 0, SOIL_LOAD_RGB);
+        auto image = SOIL_load_image(tex_path.c_str(), &width, &height, 0, SOIL_LOAD_RGB);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
         glGenerateMipmap(GL_TEXTURE_2D);
         SOIL_free_image_data(image);
